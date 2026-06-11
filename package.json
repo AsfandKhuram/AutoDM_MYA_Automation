@@ -1,0 +1,26 @@
+{
+  "name": "autodm-co-mortgagor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:dev": "LOAN_APPLICATION_ENV=dev playwright test",
+    "test:prod": "LOAN_APPLICATION_ENV=prod playwright test",
+    "test:video": "playwright test --config=playwright.video.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3"
+  }
+}
