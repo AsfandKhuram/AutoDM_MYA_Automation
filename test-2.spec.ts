@@ -5,9 +5,9 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: 'Accept Cookies' }).click();
   await page.getByTestId('button').click();
   await page.locator('#new-password').click();
-  await page.locator('#new-password').fill('Grtest123!');
+  await page.locator('#new-password').fill(process.env.TEST_PASSWORD ?? '');
   await page.locator('#confirm-password').click();
-  await page.locator('#confirm-password').fill('Grtest123!');
+  await page.locator('#confirm-password').fill(process.env.TEST_PASSWORD ?? '');
   await page.getByTestId('button').click();
   await page.goto('https://myapp.dev.rate.com/apply/personal-detail?invite-guid=0426a1d6-a003-4360-9ea2-9512f95f4836');
   await page.getByRole('textbox', { name: 'Number of dependents*' }).click();

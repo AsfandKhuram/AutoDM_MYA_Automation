@@ -30,7 +30,7 @@ test('test', async ({ page }) => {
 
   // Step 3: Login
   await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0615-28c@yopmail.com');
-  await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+  await page.getByRole('textbox', { name: 'Password' }).fill(process.env.TEST_PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   // Wait for the full OAuth chain to settle on a stable myapp page (not just the /auth/callback hop)

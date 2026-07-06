@@ -64,7 +64,7 @@ const AUTODM_CONFIRM_IDENTITY_URL = 'https://myapp.dev.rate.com/apply/confirm-id
 const AUTODM_SAMPLE_LOAN = '265116517DEV';
 const AUTODM_LOGIN_URL = 'https://login.dev.rate.com/oauth2/aus1lsk5st100GteN1d7/v1/authorize';
 const MY_GR_DEV_URL = 'https://my.gr-dev.com/loans';
-const TEST_ACCOUNT = { email: 'myaccount-alp0615-03a@yopmail.com', password: 'Grtest123!' };
+const TEST_ACCOUNT = { email: process.env.MYA_EMAIL_API ?? '', password: process.env.TEST_PASSWORD ?? '' };
 
 /**
  * Valid Spot employee status values as defined in the Malli schema

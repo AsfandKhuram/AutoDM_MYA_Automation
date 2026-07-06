@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const WORKSPACE_ROOT = process.cwd();
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 const CURRENT_ADDRESS = '7922 Chestnut Dr';
 const CURRENT_CITY = 'Westland';
 const CURRENT_COUNTY = 'Wayne';

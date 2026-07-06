@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import "./load-env";
 
 export default defineConfig({
   testDir: "./AutoDM-Prefi",

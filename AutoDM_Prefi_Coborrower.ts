@@ -25,7 +25,7 @@ test('test', async ({ page, context }) => {
   await page.getByRole('textbox', { name: 'Email' }).click();
   await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0611-02a@yopmail.com');
   await page.getByRole('textbox', { name: 'Password' }).click();
-  await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+  await page.getByRole('textbox', { name: 'Password' }).fill(process.env.TEST_PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
   
   // Wait for redirect to my.gr-dev.com

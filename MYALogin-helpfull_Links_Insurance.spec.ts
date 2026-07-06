@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const EMAIL = 'myaccount-r2.25gri07c@yopmail.com';
-const PASSWORD = 'Grtest123!';
+const PASSWORD = process.env.TEST_PASSWORD ?? '';
 const AUTH_URL = 'https://login.dev.rate.com/oauth2/aus1lsk5st100GteN1d7/v1/authorize?client_id=0oa1lsiuimcqJDqfh1d7&nonce=d8ac1fe2-8a4f-4b34-a382-fc0ab91abdab&state=ff472740-00c2-4e0c-bc6d-cf3d14a18add&scope=openid%20profile%20email%20offline_access&response_type=code&redirect_uri=https%3A%2F%2Fmy.gr-dev.com%2Fokta%2Foauth%2Fcb';
 
 async function acceptCookiesIfPresent(page) {

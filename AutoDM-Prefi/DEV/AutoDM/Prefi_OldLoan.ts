@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page, type TestInfo } from '@playwrigh
 import fs from 'fs';
 import path from 'path';
 
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 const BORROWER_FULL_NAME = 'Andy America';
 const BORROWER_EMAIL = 'myaccount-alp0609-09a@yopmail.com';
 const COBORROWER_FULL_NAME = 'Amy America';

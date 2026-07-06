@@ -24,9 +24,9 @@ test('test', async ({ page }) => {
   const newPasswordField = page.locator('#new-password');
   if (await newPasswordField.isVisible({ timeout: 5000 }).catch(() => false)) {
     await newPasswordField.click();
-    await newPasswordField.fill('Grtest123!');
+    await newPasswordField.fill(process.env.TEST_PASSWORD ?? '');
     await page.locator('#confirm-password').click();
-    await page.locator('#confirm-password').fill('Grtest123!');
+    await page.locator('#confirm-password').fill(process.env.TEST_PASSWORD ?? '');
     await page.getByTestId('button').click();
     await page.waitForLoadState('domcontentloaded');
   }
@@ -39,7 +39,7 @@ test('test', async ({ page }) => {
     const emailField = page.getByRole('textbox', { name: /email/i }).first();
     if (await emailField.isVisible({ timeout: 8000 }).catch(() => false)) {
       await emailField.fill('myaccount-alp0612-02c@yopmail.com');
-      await page.getByRole('textbox', { name: /password/i }).first().fill('Grtest123!');
+      await page.getByRole('textbox', { name: /password/i }).first().fill(process.env.TEST_PASSWORD ?? '');
       await page.getByRole('button', { name: /sign in/i }).click();
       await page.waitForURL(/myapp\.dev\.rate\.com/, { timeout: 30000 }).catch(() => {});
       await page.waitForLoadState('domcontentloaded');

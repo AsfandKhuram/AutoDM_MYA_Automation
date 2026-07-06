@@ -19,7 +19,7 @@ import * as path from 'path';
  * Provide INVITE_URL=<full url> to skip invite generation and reuse an existing invite.
  */
 
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
 // Loan used by the LO to generate a fresh co-mortgagor invite. Override with LOAN_NUMBER.
 const LOAN_NUMBER = process.env.LOAN_NUMBER ?? '265122608DEV';

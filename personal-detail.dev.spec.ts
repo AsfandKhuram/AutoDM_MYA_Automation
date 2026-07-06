@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 const DEV_URL =
 	"https://myapp.dev.rate.com/apply/personal-detail?invite-guid=0246e382-ee7e-4dfd-b578-5286b8588e29";
 const EMAIL = "myaccount-r2.25gri07c@yopmail.com";
-const PASSWORD = "Grtest123!";
+const PASSWORD = process.env.TEST_PASSWORD ?? "";
 
 async function captureRunArtifactScreenshot(page: Page, fileName: string) {
 	mkdirSync("run-artifacts", { recursive: true });

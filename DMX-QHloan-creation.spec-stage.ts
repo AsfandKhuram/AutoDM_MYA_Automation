@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
 const defaultLoanApplicationUrl = 'https://stage-qhl.dmx.saas.rate.com/?emp-id=36704';
 const loanApplicationUrl = process.env.LOAN_APPLICATION_URL ?? defaultLoanApplicationUrl;

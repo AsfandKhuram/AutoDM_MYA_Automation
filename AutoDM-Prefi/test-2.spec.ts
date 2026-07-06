@@ -33,9 +33,9 @@ test('test', async ({ page }) => {
 
   if (onSetPwPage) {
     await page.locator('[label*="Password" i]').first().click({ force: true });
-    await page.keyboard.type('Grtest123!', { delay: 50 });
+    await page.keyboard.type(process.env.TEST_PASSWORD ?? '', { delay: 50 });
     await page.locator('[label*="Confirm" i]').first().click({ force: true });
-    await page.keyboard.type('Grtest123!', { delay: 50 });
+    await page.keyboard.type(process.env.TEST_PASSWORD ?? '', { delay: 50 });
     await page.getByRole('button', { name: 'Continue' }).click();
     // After setting password, app redirects to login
     await page.getByRole('heading', { name: 'Log in to Rate' }).waitFor({ timeout: 20000 });
@@ -45,7 +45,7 @@ test('test', async ({ page }) => {
   const isOnLogin = await page.getByRole('heading', { name: 'Log in to Rate' }).isVisible().catch(() => false);
   if (isOnLogin) {
     await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0615-26c@yopmail.com');
-    await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+    await page.getByRole('textbox', { name: 'Password' }).fill(process.env.TEST_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Sign in' }).click();
     // networkidle waits for ALL redirect chains to settle (callback → app → possible re-login)
     await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {});
@@ -59,7 +59,7 @@ test('test', async ({ page }) => {
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       if (await page.getByRole('heading', { name: 'Log in to Rate' }).isVisible().catch(() => false)) {
         await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0615-26c@yopmail.com');
-        await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+        await page.getByRole('textbox', { name: 'Password' }).fill(process.env.TEST_PASSWORD ?? '');
         await page.getByRole('button', { name: 'Sign in' }).click();
         await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {});
         console.log(`📍 Post-direct-login URL: ${page.url()}`);

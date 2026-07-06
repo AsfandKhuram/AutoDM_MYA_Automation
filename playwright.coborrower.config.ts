@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import "./load-env";
 export default defineConfig({
   testDir: "./AutoDM-Prefi",
   testMatch: ["**/AutoDM_Prefi_Coborrower.ts", "**/DMX-loan-creation.spec OP.ts"],
