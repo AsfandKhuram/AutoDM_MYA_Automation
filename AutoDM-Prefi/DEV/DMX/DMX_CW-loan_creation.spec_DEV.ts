@@ -4,7 +4,9 @@ import * as path from 'path';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-const loanApplicationUrl = 'https://apply-cwhm.dev.saas.rate.com/apply/loan-purpose?emp-id=100000089';
+const DEFAULT_LOAN_APPLICATION_URL = 'https://apply-cwhm.dev.saas.rate.com/apply/loan-purpose?emp-id=100000089';
+
+const loanApplicationUrl = process.env.LOAN_APPLICATION_URL ?? DEFAULT_LOAN_APPLICATION_URL;
 
 function generateEmail(): string {
   const now = new Date();

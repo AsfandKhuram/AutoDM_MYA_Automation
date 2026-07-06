@@ -4,7 +4,9 @@ import * as path from 'path';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-const loanApplicationUrl = 'https://apply.guaranteedrate.com/apply/loan-purpose?emp-id=18580';
+const DEFAULT_LOAN_APPLICATION_URL = 'https://apply.guaranteedrate.com/apply/loan-purpose?emp-id=18580';
+
+const loanApplicationUrl = process.env.LOAN_APPLICATION_URL ?? DEFAULT_LOAN_APPLICATION_URL;
 
 function generateEmail(): string {
   const now = new Date();
