@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveLoanApplicationUrl } from '../../../dmx-urls';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-const DEFAULT_LOAN_APPLICATION_URL = 'https://apply-owning.dev.saas.rate.com/apply/loan-purpose?emp-id=100000029';
-
-const loanApplicationUrl = process.env.LOAN_APPLICATION_URL ?? DEFAULT_LOAN_APPLICATION_URL;
+// NOTE: this "OP" spec historically targets the Owning dev URL (apply-owning).
+// Change 'owning' to 'op' if it should point at Origin Point (apply-op).
+const loanApplicationUrl = resolveLoanApplicationUrl('owning');
 
 function generateEmail(): string {
   const now = new Date();

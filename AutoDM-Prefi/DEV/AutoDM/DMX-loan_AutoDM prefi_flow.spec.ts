@@ -1,19 +1,11 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveLoanApplicationUrl } from '../../../dmx-urls';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-const loanApplicationUrls = {
-  dev: 'https://apply-gri.dev.saas.rate.com/apply/loan-purpose?emp-id=12657',
-  prod: 'https://apply.guaranteedrate.com/apply/loan-purpose?emp-id=18580',
-} as const;
-
-const loanApplicationEnvironment =
-  process.env.LOAN_APPLICATION_ENV?.toLowerCase() === 'prod' ? 'prod' : 'dev';
-
-const loanApplicationUrl =
-  process.env.LOAN_APPLICATION_URL ?? loanApplicationUrls[loanApplicationEnvironment];
+const loanApplicationUrl = resolveLoanApplicationUrl('gri');
 
 function generateEmail(): string {
   const now = new Date();

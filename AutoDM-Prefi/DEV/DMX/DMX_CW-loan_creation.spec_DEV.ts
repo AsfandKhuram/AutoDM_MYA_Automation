@@ -1,12 +1,11 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveLoanApplicationUrl } from '../../../dmx-urls';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-const DEFAULT_LOAN_APPLICATION_URL = 'https://apply-cwhm.dev.saas.rate.com/apply/loan-purpose?emp-id=100000089';
-
-const loanApplicationUrl = process.env.LOAN_APPLICATION_URL ?? DEFAULT_LOAN_APPLICATION_URL;
+const loanApplicationUrl = resolveLoanApplicationUrl('cw');
 
 function generateEmail(): string {
   const now = new Date();
