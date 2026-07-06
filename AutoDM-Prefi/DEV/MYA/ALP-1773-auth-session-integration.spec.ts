@@ -11,13 +11,13 @@ import { test, expect, Page } from '@playwright/test';
  * 4. Access token retrieval for downstream API calls
  * 
  * Environment: DEV (https://my2.dev.rate.com)
- * Test Credentials: myaccount-alp0615-03a@yopmail.com / Grtest123!
+ * Test Credentials: sourced from .env (MYA_EMAIL_API / MYA_PASSWORD)
  */
 
 const DEV_BASE_URL = 'https://my2.dev.rate.com';
 const AUTH_SESSION_ENDPOINT = '/api/auth/session';
-const TEST_USER_EMAIL = 'myaccount-alp0615-03a@yopmail.com';
-const TEST_USER_PASSWORD = 'Grtest123!';
+const TEST_USER_EMAIL = process.env.MYA_EMAIL_API ?? '';
+const TEST_USER_PASSWORD = process.env.MYA_PASSWORD ?? '';
 
 // Mock Auth Session Response Structure
 type AuthSessionResponse = {

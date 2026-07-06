@@ -17,8 +17,8 @@ import { test, expect, type Page } from '@playwright/test';
  *   3. Deep-linking directly to a tab route selects the correct tab.
  */
 
-const TEST_EMAIL = 'myaccount-alp0706-01a@yopmail.com';
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_EMAIL = process.env.MYA_EMAIL_TABS ?? '';
+const TEST_PASSWORD = process.env.MYA_PASSWORD ?? '';
 const MY2_ACCOUNTS_URL = 'https://my2.dev.rate.com/accounts';
 
 const TAB_ROUTES: Array<{ name: RegExp; segment: string }> = [

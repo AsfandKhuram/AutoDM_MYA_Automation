@@ -13,8 +13,8 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 const TEST_USER = {
-  username: 'myaccount-alp0615-03a@yopmail.com',
-  password: 'Grtest123!',
+  username: process.env.MYA_EMAIL_API ?? '',
+  password: process.env.MYA_PASSWORD ?? '',
   realm: 'default'
 };
 

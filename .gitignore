@@ -5,3 +5,5 @@ run-artifacts/
 .DS_Store
 .playwright.prefi-oldloan.config.ts
 .vscode/
+.env
+.env.local

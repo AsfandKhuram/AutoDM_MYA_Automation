@@ -18,8 +18,8 @@ import { test, expect, type Page } from '@playwright/test';
  *   3. A current-page crumb is present (non-link).
  */
 
-const TEST_EMAIL = 'myaccount-alp0706-01a@yopmail.com';
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_EMAIL = process.env.MYA_EMAIL_TABS ?? '';
+const TEST_PASSWORD = process.env.MYA_PASSWORD ?? '';
 const MY2_ACCOUNTS_URL = 'https://my2.dev.rate.com/accounts';
 
 /** Log into MyAccount v2 via the Okta-hosted login (single-step email + password). */

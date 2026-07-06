@@ -3,8 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Test credentials
-const TEST_EMAIL = 'myaccount-alp0618-03a@yopmail.com';
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_EMAIL = process.env.MYA_EMAIL_OKTA ?? '';
+const TEST_PASSWORD = process.env.MYA_PASSWORD ?? '';
 const MY2_ACCOUNTS_URL = 'https://my2.dev.rate.com/accounts';
 
 /**

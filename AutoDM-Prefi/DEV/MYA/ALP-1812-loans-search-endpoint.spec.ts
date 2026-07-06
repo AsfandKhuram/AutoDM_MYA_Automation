@@ -20,8 +20,8 @@ const SEARCH_NOT_READY_STATUSES = [400, 404];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // Test account that has at least one loan (including a co-mortgagor loan)
-const TEST_EMAIL = 'myaccount-alp0615-03a@yopmail.com';
-const TEST_PASSWORD = 'Grtest123!';
+const TEST_EMAIL = process.env.MYA_EMAIL_API ?? '';
+const TEST_PASSWORD = process.env.MYA_PASSWORD ?? '';
 
 /**
  * Log in and capture the raw auth headers from the actual loans API request
