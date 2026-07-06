@@ -5,9 +5,7 @@ import { resolveLoanApplicationUrl } from '../../../dmx-urls';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
-// NOTE: this "OP" spec historically targets the Owning dev URL (apply-owning).
-// Change 'owning' to 'op' if it should point at Origin Point (apply-op).
-const loanApplicationUrl = resolveLoanApplicationUrl('owning');
+const loanApplicationUrl = resolveLoanApplicationUrl('op');
 
 function generateEmail(): string {
   const now = new Date();
