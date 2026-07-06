@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveLoanApplicationUrl } from '../../../dmx-urls';
+import { PRIMARY_BORROWER, PRIMARY_COBORROWER } from '../../../test-data';
 
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? '';
 
@@ -121,10 +122,10 @@ test('test', async ({ page }) => {
 
   await page.getByTestId('radio-button-0-I\'m Purchasing').click();
   await page.getByTestId('user-first-name-input').click();
-  await page.getByTestId('user-first-name-input').fill('Andy');
+  await page.getByTestId('user-first-name-input').fill(PRIMARY_BORROWER.firstName);
   await page.getByTestId('user-last-name-input').click();
-  await page.getByTestId('user-last-name-input').fill('America');
-  await page.getByTestId('user-home-phone-input').fill('2482253648');
+  await page.getByTestId('user-last-name-input').fill(PRIMARY_BORROWER.lastName);
+  await page.getByTestId('user-home-phone-input').fill(PRIMARY_BORROWER.phone);
   await page.getByTestId('user-email-input').fill(email);
   // Select Email as communication method and agree
   await page.getByRole('combobox').filter({ has: page.locator('option', { hasText: 'Email' }) }).selectOption({ label: 'Email' });
@@ -191,9 +192,9 @@ test('test', async ({ page }) => {
   // Wait for spouse name inputs to be visible, then click+fill each one
   await page.getByRole('textbox', { name: /first.*name/i }).first().waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('textbox', { name: /first.*name/i }).first().click();
-  await page.getByRole('textbox', { name: /first.*name/i }).first().fill('Amy');
+  await page.getByRole('textbox', { name: /first.*name/i }).first().fill(PRIMARY_COBORROWER.firstName);
   await page.getByRole('textbox', { name: /last.*name/i }).first().click();
-  await page.getByRole('textbox', { name: /last.*name/i }).first().fill('America');
+  await page.getByRole('textbox', { name: /last.*name/i }).first().fill(PRIMARY_COBORROWER.lastName);
 
   // 12. Owned home last 3 years - No, dependents - No, continue
   // Owned home No: first No radio inside the outer radiogroup
@@ -264,7 +265,7 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: /email/i }).fill(coEmail);
 
   // 16 (new 4). Amy's phone number
-  await page.getByRole('textbox', { name: /phone/i }).fill('2486546956');
+  await page.getByRole('textbox', { name: /phone/i }).fill(PRIMARY_COBORROWER.phone);
 
   // 16 (new 5). Has Amy owned a property in the last 3 years? - No
   await page.getByRole('radiogroup', { name: /has amy owned a property in the last 3 years/i })
@@ -301,8 +302,8 @@ test('test', async ({ page }) => {
   for (const checkbox of await page.getByRole('checkbox').all()) {
     if (await checkbox.isVisible() && !(await checkbox.isChecked())) await checkbox.check();
   }
-  await page.getByRole('textbox', { name: /ssn|social security/i }).fill('999-60-3333');
-  await page.getByRole('textbox', { name: /dob|date of birth|birth/i }).fill('01/01/1980');
+  await page.getByRole('textbox', { name: /ssn|social security/i }).fill(PRIMARY_BORROWER.ssn);
+  await page.getByRole('textbox', { name: /dob|date of birth|birth/i }).fill(PRIMARY_BORROWER.dob);
   await page.getByRole('button', { name: /^continue$/i }).click();
 
   // 16 (new 12). Amy credit check: check all consent boxes, fill SSN/DOB, continue
@@ -310,8 +311,8 @@ test('test', async ({ page }) => {
   for (const checkbox of await page.getByRole('checkbox').all()) {
     if (await checkbox.isVisible() && !(await checkbox.isChecked())) await checkbox.check();
   }
-  await page.getByRole('textbox', { name: /ssn|social security/i }).fill('500-60-2222');
-  await page.getByRole('textbox', { name: /dob|date of birth|birth/i }).fill('01/02/1980');
+  await page.getByRole('textbox', { name: /ssn|social security/i }).fill(PRIMARY_COBORROWER.ssn);
+  await page.getByRole('textbox', { name: /dob|date of birth|birth/i }).fill(PRIMARY_COBORROWER.dob);
   await page.getByRole('button', { name: /^continue$/i }).click();
   _logTime('amy-credit done');
 
