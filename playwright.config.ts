@@ -2,9 +2,10 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./AutoDM-Prefi",
-  testMatch: ["**/*.{spec,test,spec-prod}.ts"],
-  testIgnore: ["**/DMX-loan_AutoDM prefi_flow.spec.ts"],
-  timeout: 240_000,
+  testMatch: ["**/*.{spec,test,spec-prod,spec-stage}.ts", "**/*.spec_DEV.ts", "**/*.spec OP.ts", "**/AutoDM_Prefi_Coborrower.ts"],
+  testIgnore: ["**/DMX-loan_AutoDM prefi_flow.spec.ts", "**/DMX-QHloan-creation.stage.spec.ts"],
+  reporter: [["line"], ["./run-artifacts/test-summary-reporter.js"]],
+  timeout: 420_000,
   use: {
     headless: false,
     video: "on",

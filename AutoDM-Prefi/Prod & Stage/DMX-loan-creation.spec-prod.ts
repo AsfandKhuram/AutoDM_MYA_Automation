@@ -4,16 +4,7 @@ import * as path from 'path';
 
 const TEST_PASSWORD = 'Grtest123!';
 
-const loanApplicationUrls = {
-  dev: 'https://apply-gri.dev.saas.rate.com/apply/loan-purpose?emp-id=12657',
-  prod: 'https://apply.guaranteedrate.com/apply/loan-purpose?emp-id=18580',
-} as const;
-
-const loanApplicationEnvironment =
-  process.env.LOAN_APPLICATION_ENV?.toLowerCase() === 'prod' ? 'prod' : 'dev';
-
-const loanApplicationUrl =
-  process.env.LOAN_APPLICATION_URL ?? loanApplicationUrls[loanApplicationEnvironment];
+const loanApplicationUrl = 'https://apply.rate.com/apply/loan-purpose?mp-id=24138';
 
 function generateEmail(): string {
   const now = new Date();
@@ -35,12 +26,12 @@ function generateEmail(): string {
   fs.mkdirSync(path.dirname(stateFile), { recursive: true });
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
 
-  return `myaccount-alp${mmdd}-${String(state.counter).padStart(2, '0')}a@yopmail.com`;
+  return `myaccount-${mmdd}alp${String(state.counter).padStart(2, '0')}a--a@yopmail.com`;
 }
 
 test('test', async ({ page }) => {
   const email = generateEmail();
-  const coEmail = email.replace(/a@yopmail\.com$/, 'b@yopmail.com');
+  const coEmail = email.replace(/a--a@yopmail\.com$/, 'b--a@yopmail.com');
   console.log(`Running with email: ${email}`);
   const _t0 = Date.now();
   const _logTime = (label: string) => console.log(`[${((Date.now() - _t0) / 1000).toFixed(0)}s] ${label}`);
@@ -61,12 +52,24 @@ test('test', async ({ page }) => {
     }
   })();
 
-  await page.goto(loanApplicationUrl, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.goto(loanApplicationUrl);
 
-  // Auto-dismiss cookie consent banner whenever it appears
+  // Auto-dismiss cookie consent banner whenever it appears.
+  // Target the OneTrust button directly, then strip the banner/overlay from the
+  // DOM so Playwright reliably sees it as hidden (a plain click sometimes leaves
+  // the button visible and keeps intercepting subsequent actions).
   await page.addLocatorHandler(
-    page.getByRole('button', { name: /accept cookies/i }),
-    async () => { await page.getByRole('button', { name: /accept cookies/i }).click(); }
+    page.locator('#onetrust-accept-btn-handler'),
+    async () => {
+      await page.locator('#onetrust-accept-btn-handler')
+        .click({ timeout: 5000 }).catch(() => {});
+      await page.evaluate(() => {
+        document.querySelectorAll(
+          '#onetrust-banner-sdk, #onetrust-consent-sdk, .onetrust-pc-dark-filter'
+        ).forEach(el => el.remove());
+      }).catch(() => {});
+    },
+    { noWaitAfter: true }
   );
 
   // Keep session alive: handle "Anyone Home?" idle timeout overlay
@@ -87,9 +90,34 @@ test('test', async ({ page }) => {
     }
   );
 
-  await page.getByTestId('radio-button-0-I\'m Purchasing').click();
-  await page.getByTestId('user-first-name-input').click();
-  await page.getByTestId('user-first-name-input').fill('Andy');
+  // 0. Welcome page (redesigned): Type of loan, State, Self-selected credit score, then Continue
+  await page.getByRole('combobox', { name: /type of loan/i }).selectOption({ label: "I'm Purchasing" });
+  await page.getByRole('combobox', { name: /^state/i }).selectOption({ label: 'Michigan' });
+  await page.getByRole('combobox', { name: /credit score/i }).selectOption({ label: 'Excellent (740+)' });
+  // Selecting the dropdowns reveals price fields
+  await page.getByRole('textbox', { name: /estimated home price/i }).fill('300000');
+  await page.getByRole('textbox', { name: /down payment amount/i }).fill('60000');
+  await page.getByRole('button', { name: /^continue$/i }).click();
+  await page.waitForLoadState('domcontentloaded');
+  _logTime('welcome page done');
+
+  // 0b. Personal details page: name, phone, email, communication method, agree & continue
+  // The Welcome section may show optional Yes/No interstitials first
+  // (e.g. "Are you already working with someone from Rate?"). Answer No until the name field appears.
+  const firstNameInput = page.getByTestId('user-first-name-input');
+  for (let _w = 0; _w < 4; _w++) {
+    if (await firstNameInput.isVisible({ timeout: 2000 }).catch(() => false)) break;
+    const noRadio = page.getByRole('radiogroup').getByRole('radio', { name: /^no$/i }).first();
+    if (await noRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await noRadio.click().catch(() => {});
+      await page.getByRole('button', { name: /^continue$/i }).click({ timeout: 5000 }).catch(() => {});
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+    } else {
+      break;
+    }
+  }
+  await firstNameInput.click();
+  await firstNameInput.fill('Andy');
   await page.getByTestId('user-last-name-input').click();
   await page.getByTestId('user-last-name-input').fill('America');
   await page.getByTestId('user-home-phone-input').fill('2482253648');
@@ -103,9 +131,9 @@ test('test', async ({ page }) => {
   await page.getByTestId('user-confirm-password-input').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: /^continue$/i }).click();
 
-  // 2. How did you hear about me? - select Google, then continue
-  await page.waitForURL(/welcome-referral/i, { timeout: 30000 });
-  await page.getByRole('combobox').first().selectOption({ label: 'Google' });
+  // 2. Are you working with a real estate agent? - No, then continue
+  await page.waitForURL(/agent-inquiry/i, { timeout: 30000 });
+  await page.getByRole('radiogroup').getByRole('radio', { name: /^no$/i }).click();
   await page.getByRole('button', { name: /^continue$/i }).click();
   await page.waitForLoadState('domcontentloaded');
 
@@ -142,12 +170,6 @@ test('test', async ({ page }) => {
 
   // 8. Monthly housing budget - check "I don't know" and continue
   await page.getByLabel(/i don't know what my monthly budget is yet/i).check();
-  await page.getByRole('button', { name: /^continue$/i }).click();
-
-  // 9. Price range - target $300,000, max $400,000, down payment $60,000, then continue
-  await page.getByRole('textbox', { name: /target.*price|purchase.*price/i }).first().fill('300000');
-  await page.getByRole('textbox', { name: /maximum.*price|max.*price/i }).first().fill('400000');
-  await page.getByRole('textbox', { name: /down payment/i }).first().fill('60000');
   await page.getByRole('button', { name: /^continue$/i }).click();
 
   // 10. Marital status - first option
@@ -392,44 +414,30 @@ test('test', async ({ page }) => {
     await page.waitForLoadState('domcontentloaded').catch(() => {});
   }
 
-  // 20. Assets - BOA savings account, bace $30,000, owner Both
+  // 20. Assets - BOA savings account, balance $30,000, owner Both
   // Heading may be "Enter accounts manually" (after Mastercard) or "Confirm your own and any joint assets" (direct path)
-  // Some runs render two asset cards. Always fill only the first card, then continue.
   await page.getByRole('heading', { name: /enter accounts manually|confirm your own and any joint assets/i }).waitFor({ timeout: 30000 });
-  await page.getByRole('combobox', { name: /account type/i }).first().selectOption('Savings account');
   await page.getByRole('textbox', { name: /financial institution/i }).first().fill('BOA');
+  await page.getByRole('combobox', { name: /account type/i }).first().selectOption('Savings account');
   await page.getByRole('textbox', { name: /balance/i }).first().fill('30000');
   await page.getByRole('combobox', { name: /owner/i }).first().selectOption('Both');
-
-  const assetHeading = page.getByRole('heading', { name: /enter accounts manually|confirm your own and any joint assets/i });
-  const continueBtn = page.getByRole('button', { name: /^continue$/i }).first();
-
-  // Continue may be blocked by an inline "another account" question depending on variant.
-  await continueBtn.scrollIntoViewIfNeeded().catch(() => {});
-  if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await continueBtn.click({ timeout: 5000 }).catch(() => {});
-  }
-
-  if (await assetHeading.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const noAnotherAccountButton = page.locator('div')
-      .filter({ hasText: /do you have another account to add/i })
-      .last()
-      .getByRole('button', { name: /^no$/i });
-    const noAnotherAccountRadio = page.locator('div')
-      .filter({ hasText: /add account/i, has: page.getByRole('radio') })
-      .last()
-      .getByRole('radio', { name: /^no$/i });
-
-    if (await noAnotherAccountButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await noAnotherAccountButton.click({ timeout: 5000 }).catch(() => {});
-    } else if (await noAnotherAccountRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await noAnotherAccountRadio.click({ timeout: 5000 }).catch(() => {});
-      if (await continueBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await continueBtn.click({ timeout: 5000 }).catch(() => {});
-      }
-    } else if (await continueBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await continueBtn.click({ timeout: 5000 }).catch(() => {});
-    }
+  // Some runs show an "Add account?" Yes/No radio, others only show Continue.
+  const addAccountNoRadio = page.locator('div')
+    .filter({ hasText: /add account/i, has: page.getByRole('radio') })
+    .last()
+    .getByRole('radio', { name: /^no$/i });
+  const addAccountNoButton = page.locator('div')
+    .filter({ hasText: /do you have another account to add/i })
+    .last()
+    .getByRole('button', { name: /^no$/i });
+  if (await addAccountNoButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await addAccountNoButton.click();
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  } else if (await addAccountNoRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await addAccountNoRadio.click();
+  } else {
+    await page.getByRole('button', { name: /^continue$/i }).click();
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
   }
 
   // 20a. Asset summary page — if it appears, click No radio and continue
@@ -453,15 +461,9 @@ test('test', async ({ page }) => {
   for (let _aq = 0; _aq < 8; _aq++) {
     if (await page.getByRole('heading', { name: /what kind of assets do you want to add/i })
       .isVisible({ timeout: 1000 }).catch(() => false)) break;
-    const noButton = page.getByRole('button', { name: /^no$/i }).first();
     const noRadio = page.getByRole('radio', { name: /^no$/i }).first();
-    if (await noButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await noButton.click({ timeout: 3000 }).catch(() => {});
-    } else if (await noRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await noRadio.click({ timeout: 3000 }).catch(() => {});
-    } else {
-      break;
-    }
+    if (!await noRadio.isVisible({ timeout: 2000 }).catch(() => false)) break;
+    await noRadio.click();
     await page.getByRole('button', { name: /^continue$/i }).click({ timeout: 3000 }).catch(() => {});
     await page.waitForLoadState('domcontentloaded').catch(() => {});
   }
@@ -525,6 +527,21 @@ test('test', async ({ page }) => {
   }
   _logTime('21f done');
 
+  // 21g. Asset confirmation can reappear late; keep answering "No" until it clears.
+  for (let _m = 0; _m < 6; _m++) {
+    const assetConfirmVisible = await page.getByRole('heading', { name: /confirm your own and any joint assets/i })
+      .isVisible({ timeout: _m === 0 ? 3000 : 1000 }).catch(() => false);
+    if (!assetConfirmVisible) break;
+    const noAnotherAccount = page.locator('div')
+      .filter({ hasText: /do you have another account to add/i })
+      .last()
+      .getByRole('button', { name: /^no$/i });
+    if (!await noAnotherAccount.isVisible({ timeout: 1500 }).catch(() => false)) break;
+    await noAnotherAccount.click({ timeout: 3000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded', { timeout: 3000 }).catch(() => {});
+    _logTime(`21g: extra asset prompt dismissed ${_m}`);
+  }
+
   const pickGovOption = async (name: RegExp) => {
     const radio = page.getByRole('radio', { name }).first();
     if (await radio.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -583,6 +600,7 @@ test('test', async ({ page }) => {
     }
   };
 
+  // 21h. Final cleanup before borrower government section.
   await settleUntilGovOption(/^male$/i, '21h');
 
   _logTime('entering step22 (govt questions)');
@@ -609,6 +627,7 @@ test('test', async ({ page }) => {
   await page.getByText(/^english$/i).click();
   await page.getByRole('button', { name: /^continue$/i }).click();
 
+  // 24b. Final cleanup before co-borrower government section.
   await settleUntilGovOption(/^female$/i, '24b');
 
   // 25. Co-government questions (Amy) - Female, Not Hispanic or Latino, White, continue
@@ -670,29 +689,30 @@ test('test', async ({ page }) => {
     _logTime('application-summary Continue clicked');
   }
 
-  // 29. After AUS redirect, wait for OAuth login or MYA loan page
-  await page.waitForURL(/login\.dev\.rate\.com|my\.gr-dev\.com\/loan\//i);
+  // 29. After AUS redirect, wait for OAuth login or MYA loan page (prod only)
+  const myaRedirectPattern = /my\.rate\.com\/(?:login|loan\/|loans)/i;
+  await page.waitForURL(myaRedirectPattern, { timeout: 60000 });
   _logTime('step29 done (OAuth redirect received)');
 
-  // 30. Handle OAuth login redirect (login.dev.rate.com) then capture MYA loan number
-  await page.waitForURL(/login\.dev\.rate\.com|my\.gr-dev\.com\/loan\//i, { timeout: 5000 }).catch(() => {});
-  if (/login\.dev\.rate\.com/.test(page.url())) {
+  // 30. Handle OAuth login redirect (prod) then capture MYA loan number
+  await page.waitForURL(myaRedirectPattern, { timeout: 5000 }).catch(() => {});
+  if (/my\.rate\.com\/login/i.test(page.url())) {
     // Two-step login: Email → Next → Password → Log In
     await page.getByRole('textbox', { name: /email/i }).fill(email);
     await page.getByRole('button', { name: /^next$/i }).click();
     await page.getByRole('textbox', { name: /password/i }).waitFor({ state: 'visible', timeout: 15000 });
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_PASSWORD);
     await page.getByRole('button', { name: /log.?in|sign.?in/i }).click();
-    await page.waitForURL(/my\.gr-dev\.com\/loan\//i);
+    await page.waitForURL(/my\.rate\.com\/(?:loan\/|loans)/i, { timeout: 60000 });
     await page.waitForLoadState('networkidle').catch(() => {});
   }
   _logTime(`post-login URL: ${page.url()}`);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  // Loan number paragraph shows e.g. "Purchase 265098865DEV" — extract just the number part
-  const loanNumberEl = page.getByText(/purchase\s+\w+/i).first();
+  // Loan number paragraph shows e.g. "Purchase #265688888" — extract just the number part
+  const loanNumberEl = page.getByText(/purchase\s+#?\w+/i).first();
   await expect(loanNumberEl).toBeVisible({ timeout: 30000 });
   const fullBannerText = await loanNumberEl.textContent();
-  const loanNumber = fullBannerText?.match(/purchase\s+(\w+)/i)?.[1] ?? fullBannerText?.trim();
+  const loanNumber = fullBannerText?.match(/purchase\s+#?(\w+)/i)?.[1] ?? fullBannerText?.trim();
 
   // ── Captured data ──────────────────────────────────────────────
   console.log('══════════════════════════════════════════');

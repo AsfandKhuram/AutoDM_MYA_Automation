@@ -1,17 +1,98 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    const screenshotBuffer = await page.screenshot({ fullPage: true }).catch(() => null);
+    if (screenshotBuffer) {
+      const screenshotDir = path.resolve('screenshots');
+      fs.mkdirSync(screenshotDir, { recursive: true });
+      const screenshotFile = path.join(screenshotDir, `failure-${testInfo.title.replace(/\W+/g, '_')}-${Date.now()}.png`);
+      fs.writeFileSync(screenshotFile, screenshotBuffer);
+      await testInfo.attach('screenshot-on-failure', { body: screenshotBuffer, contentType: 'image/png' });
+    }
+  }
+});
 
 test('test', async ({ page }) => {
-  await page.goto('https://myapp.dev.rate.com/?invite-guid=0426a1d6-a003-4360-9ea2-9512f95f4836');
-  await page.getByRole('button', { name: 'Accept Cookies' }).click();
-  await page.getByTestId('button').click();
-  await page.locator('#new-password').click();
-  await page.locator('#new-password').fill('Grtest123!');
-  await page.locator('#confirm-password').click();
-  await page.locator('#confirm-password').fill('Grtest123!');
-  await page.getByTestId('button').click();
-  await page.goto('https://myapp.dev.rate.com/apply/personal-detail?invite-guid=0426a1d6-a003-4360-9ea2-9512f95f4836');
-  await page.getByRole('textbox', { name: 'Number of dependents*' }).click();
-  await page.getByRole('textbox', { name: 'Number of dependents*' }).fill('0');
+  await page.goto('https://myapp.dev.rate.com/?invite-guid=40ab7d6e-4c19-4317-80e4-82bf211c0689');
+  await page.getByRole('button', { name: 'Accept Cookies' }).click().catch(() => {});
+
+  // The invite URL initially lands on myapp.dev.rate.com, then JS redirects to login.
+  // Wait for a meaningful element to appear — login heading, password-set field, or app content.
+  await Promise.race([
+    page.getByRole('heading', { name: 'Log in to Rate' }).waitFor({ timeout: 25000 }),
+    page.locator('[label*="Password" i]').first().waitFor({ timeout: 25000 }),
+    page.getByText(/Number of dependents|will there be anyone else/i).waitFor({ timeout: 25000 }),
+  ]).catch(() => {});
+
+  // Set password screen (fresh invite) — shadow DOM fields
+  const onSetPwPage = await page.locator('[label*="Password" i]').first()
+    .isVisible().catch(() => false);
+
+  if (onSetPwPage) {
+    await page.locator('[label*="Password" i]').first().click({ force: true });
+    await page.keyboard.type('Grtest123!', { delay: 50 });
+    await page.locator('[label*="Confirm" i]').first().click({ force: true });
+    await page.keyboard.type('Grtest123!', { delay: 50 });
+    await page.getByRole('button', { name: 'Continue' }).click();
+    // After setting password, app redirects to login
+    await page.getByRole('heading', { name: 'Log in to Rate' }).waitFor({ timeout: 20000 });
+  }
+
+  // Login screen — identified by the "Log in to Rate" heading
+  const isOnLogin = await page.getByRole('heading', { name: 'Log in to Rate' }).isVisible().catch(() => false);
+  if (isOnLogin) {
+    await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0615-26c@yopmail.com');
+    await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    // networkidle waits for ALL redirect chains to settle (callback → app → possible re-login)
+    await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {});
+    console.log(`📍 Post-login URL: ${page.url()}`);
+
+    // If the invite-guid was already used, the callback may bounce us back to login.
+    // In that case navigate directly (without invite-guid) and sign in fresh.
+    if (/login\.dev\.rate\.com/i.test(page.url())) {
+      console.log('⚠️  Bounced back to login — navigating directly to app without invite-guid');
+      await page.goto('https://myapp.dev.rate.com/');
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      if (await page.getByRole('heading', { name: 'Log in to Rate' }).isVisible().catch(() => false)) {
+        await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0615-26c@yopmail.com');
+        await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
+        await page.getByRole('button', { name: 'Sign in' }).click();
+        await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {});
+        console.log(`📍 Post-direct-login URL: ${page.url()}`);
+      }
+    }
+  }
+
+  // After login, the app may show the coborrower question — click No
+  await page.waitForLoadState('domcontentloaded');
+  const coborrowerQ = page.getByText(/will there be anyone else/i);
+  if (await coborrowerQ.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await page.getByRole('button', { name: 'No' }).click();
+    await page.waitForLoadState('domcontentloaded');
+  }
+
+  // Welcome screen may appear next — click through it
+  if (/register\/welcome/i.test(page.url())) {
+    const continueBtn = page.getByRole('button', { name: /continue|get started|next|begin/i }).first();
+    const hasContinue = await continueBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    if (hasContinue) {
+      await continueBtn.click();
+    } else {
+      // Try any primary button on the page
+      await page.getByRole('button').first().click().catch(() => {});
+    }
+    await page.waitForLoadState('domcontentloaded');
+  }
+
+
+  const dependentsField = page.getByRole('textbox', { name: 'Number of dependents*' });
+  await dependentsField.waitFor({ state: 'visible', timeout: 30000 });
+  await dependentsField.click();
+  await dependentsField.fill('0');
   await page.getByTestId('dropdown-label').click();
   await page.getByRole('option', { name: 'Married', exact: true }).click();
   await page.getByText('IdentityVerifyCreditYour').click();
@@ -35,7 +116,7 @@ test('test', async ({ page }) => {
   await page.getByTestId('dropdown-label').click();
   await page.getByRole('option', { name: 'Monthly' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.locator('[id="1"]').click();
+  await page.locator('[id="1"]').first().click();
   await page.getByRole('checkbox', { name: 'I, John Homeowner, certify to' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Add employment' }).click();

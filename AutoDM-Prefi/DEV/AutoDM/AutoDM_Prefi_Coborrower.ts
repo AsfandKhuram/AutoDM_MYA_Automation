@@ -1,6 +1,18 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
-test.afterEach(async ({ context }) => {
+test.afterEach(async ({ page, context }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    const screenshotBuffer = await page.screenshot({ fullPage: true }).catch(() => null);
+    if (screenshotBuffer) {
+      const screenshotDir = path.resolve('screenshots');
+      fs.mkdirSync(screenshotDir, { recursive: true });
+      const screenshotFile = path.join(screenshotDir, `failure-${testInfo.title.replace(/\W+/g, '_')}-${Date.now()}.png`);
+      fs.writeFileSync(screenshotFile, screenshotBuffer);
+      await testInfo.attach('screenshot-on-failure', { body: screenshotBuffer, contentType: 'image/png' });
+    }
+  }
   await context.close().catch(() => {});
 });
 
@@ -23,7 +35,7 @@ test('test', async ({ page, context }) => {
   await page.getByRole('button', { name: 'Close' }).click().catch(() => {});
   
   await page.getByRole('textbox', { name: 'Email' }).click();
-  await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0611-02a@yopmail.com');
+  await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-alp0626-09a@yopmail.com');
   await page.getByRole('textbox', { name: 'Password' }).click();
   await page.getByRole('textbox', { name: 'Password' }).fill('Grtest123!');
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -117,7 +129,7 @@ test('test', async ({ page, context }) => {
       const field = candidate.first();
       const isVisible = await field.isVisible().catch(() => false);
       if (!isVisible) continue;
-      await field.fill('3333').catch(() => {});
+      await field.fill('8223').catch(() => {});
       ssnFilled = true;
       break;
     }

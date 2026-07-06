@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./AutoDM-Prefi",
   testMatch: ["**/MYALogin-helpfull_Links_Insurance.spec.ts"],
+  reporter: [["line"], ["./run-artifacts/test-summary-reporter.js"]],
   timeout: 240_000,
   use: {
     headless: false,

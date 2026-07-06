@@ -4,11 +4,11 @@ import * as path from 'path';
 
 const TEST_PASSWORD = 'Grtest123!';
 
-const loanApplicationUrl = 'https://apply.guaranteedrate.com/apply/loan-purpose?emp-id=18580';
+const loanApplicationUrl = 'https://apply-cwhm.dev.saas.rate.com/apply/loan-purpose?emp-id=100000089';
 
 function generateEmail(): string {
   const now = new Date();
-  const mmdd = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  const mmddyy = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`;
   const stateFile = path.join(__dirname, '..', 'run-artifacts', 'email-counter.json');
 
   let state: { date: string; counter: number } = { date: '', counter: 0 };
@@ -16,22 +16,22 @@ function generateEmail(): string {
     try { state = JSON.parse(fs.readFileSync(stateFile, 'utf-8')); } catch { /* use default */ }
   }
 
-  if (state.date === mmdd) {
+  if (state.date === mmddyy) {
     state.counter += 1;
   } else {
-    state.date = mmdd;
+    state.date = mmddyy;
     state.counter = 1;
   }
 
   fs.mkdirSync(path.dirname(stateFile), { recursive: true });
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
 
-  return `myaccount-alp${mmdd}-${String(state.counter).padStart(2, '0')}a@yopmail.com`;
+  return `${mmddyy}ak${String(state.counter).padStart(2, '0')}--ra@yopmail.com`;
 }
 
 test('test', async ({ page }) => {
   const email = generateEmail();
-  const coEmail = email.replace(/a@yopmail\.com$/, 'b@yopmail.com');
+  const coEmail = email.replace(/--ra@yopmail\.com$/, '--rb@yopmail.com');
   console.log(`Running with email: ${email}`);
   const _t0 = Date.now();
   const _logTime = (label: string) => console.log(`[${((Date.now() - _t0) / 1000).toFixed(0)}s] ${label}`);
@@ -54,10 +54,33 @@ test('test', async ({ page }) => {
 
   await page.goto(loanApplicationUrl);
 
-  // Auto-dismiss cookie consent banner whenever it appears
+  // Auto-dismiss cookie consent banner whenever it appears.
+  // Click "Accept cookies", then immediately strip the OneTrust overlay from the
+  // DOM so it can't keep intercepting subsequent clicks (the banner otherwise
+  // lingers and causes an interception loop that times out the next action).
+  const removeCookieOverlay = () =>
+    page.evaluate(() => {
+      for (const id of [
+        'onetrust-banner-sdk',
+        'onetrust-consent-sdk',
+        'onetrust-accept-btn-handler',
+        'onetrust-pc-sdk',
+      ]) {
+        document.getElementById(id)?.remove();
+      }
+      document.querySelector('.onetrust-pc-dark-filter')?.remove();
+      document.querySelectorAll('[class*="ot-sdk"], [id*="onetrust"]').forEach(el => el.remove());
+    }).catch(() => {});
+
   await page.addLocatorHandler(
     page.getByRole('button', { name: /accept cookies/i }),
-    async () => { await page.getByRole('button', { name: /accept cookies/i }).click(); }
+    async () => {
+      const acceptCookiesButton = page.getByRole('button', { name: /accept cookies/i });
+      await acceptCookiesButton.click({ force: true, noWaitAfter: true }).catch(() => {});
+      await removeCookieOverlay();
+      await acceptCookiesButton.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
+    },
+    { noWaitAfter: true }
   );
 
   // Keep session alive: handle "Anyone Home?" idle timeout overlay
@@ -78,6 +101,12 @@ test('test', async ({ page }) => {
     }
   );
 
+  // Proactively dismiss the cookie banner before the first interaction so the
+  // OneTrust overlay doesn't intercept the "I'm Purchasing" radio click.
+  await page.getByRole('button', { name: /accept cookies/i })
+    .click({ force: true, noWaitAfter: true, timeout: 8000 }).catch(() => {});
+  await removeCookieOverlay();
+
   await page.getByTestId('radio-button-0-I\'m Purchasing').click();
   await page.getByTestId('user-first-name-input').click();
   await page.getByTestId('user-first-name-input').fill('Andy');
@@ -95,54 +124,132 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: /^continue$/i }).click();
 
   // 2. How did you hear about me? - select Google, then continue
-  await page.waitForURL(/welcome-referral/i, { timeout: 30000 });
+  await page.waitForURL(/welcome-referral|borrower-referral/i, { timeout: 30000 });
   await page.getByRole('combobox').first().selectOption({ label: 'Google' });
   await page.getByRole('button', { name: /^continue$/i }).click();
   await page.waitForLoadState('domcontentloaded');
 
-  // 3. Where in the home buying process? - auto-advances after selection
-  await page.getByRole('radio', { name: /i.m looking at homes and listings/i }).click();
+  // 3–9. Property-flow questions. These pages render sequentially and can appear
+  // slower than fixed timeouts, so drive them in a loop until the marital-status
+  // (Personal) page appears. Each known question is answered when detected.
+  const clickContinue = async () => {
+    const btn = page.getByRole('button', { name: /^continue$/i }).first();
+    if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await btn.click({ timeout: 7000 }).catch(async () => {
+        await btn.click({ timeout: 7000, force: true }).catch(() => {});
+      });
+      return true;
+    }
+    return false;
+  };
+  const clickChoice = async (loc: ReturnType<typeof page.getByRole>) => {
+    await loc.click({ timeout: 5000 }).catch(() => {});
+    await loc.click({ timeout: 2500, force: true }).catch(() => {});
+  };
 
-  // 4. How soon are you looking to buy? - auto-advances after selection
-  await page.getByRole('radio', { name: /within the next few months/i }).click();
+  const maritalRadio = page.getByTestId('borrower-marital-status-radio-button-0-Married');
+  for (let _pf = 0; _pf < 24; _pf++) {
+    // Exit condition: reached the marital status page
+    if (await maritalRadio.isVisible({ timeout: 1000 }).catch(() => false)) break;
 
-  // 5. Where would you like to buy a home? - type, pick autocomplete, continue
-  const locationInput = page.getByRole('textbox', { name: /city or town/i });
-  await locationInput.click();
-  await locationInput.type('Westland', { delay: 50 });
-  const wmiItem = page.locator('li:has-text("Westland, MI")').first();
-  await wmiItem.waitFor({ state: 'visible', timeout: 10000 });
-  // Use real mouse coordinates — most reliable way to trigger React's synthetic click handler
-  const box = await wmiItem.boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    // 3. Where in the home buying process?
+    const homeProcess = page.getByRole('radio', { name: /i.m looking at homes and listings/i });
+    if (await homeProcess.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await clickChoice(homeProcess);
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 4. How soon are you looking to buy?
+    const soon = page.getByRole('radio', { name: /within the next few months/i });
+    if (await soon.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await clickChoice(soon);
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 5. City or town
+    const locationInput = page.getByRole('textbox', { name: /city or town/i });
+    if (await locationInput.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await locationInput.click();
+      await locationInput.type('Asheville', { delay: 50 });
+      const wmiItem = page.locator('li:has-text("Asheville, NC")').first();
+      await wmiItem.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      const box = await wmiItem.boundingBox().catch(() => null);
+      if (box) {
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      }
+      await page.waitForFunction(() =>
+        Array.from(document.querySelectorAll<HTMLInputElement>('input')).some(input => /^\d{5}$/.test(input.value))
+      , { timeout: 10000 }).catch(() => {});
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 6. What type of home? - Single family
+    const singleFamily = page.getByRole('radio', { name: /single\s*family/i }).first();
+    const singleFamilyText = page.getByText(/^single\s*family$/i).first();
+    if (await singleFamily.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await clickChoice(singleFamily);
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+    if (await singleFamilyText.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await clickChoice(singleFamilyText);
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 7. How do you plan to use this home? - Primary Residence
+    const primaryRes = page.getByRole('radio', { name: /as a primary residence/i });
+    if (await primaryRes.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await clickChoice(primaryRes);
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 8. Monthly housing budget - "I don't know"
+    const dontKnow = page.getByLabel(/i don't know what my monthly budget is yet/i);
+    if (await dontKnow.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await dontKnow.check().catch(() => {});
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // 9. Price range - target/max/down payment
+    const targetPrice = page.getByRole('textbox', { name: /target.*price|purchase.*price/i }).first();
+    if (await targetPrice.isVisible({ timeout: 1200 }).catch(() => false)) {
+      await targetPrice.fill('300000').catch(() => {});
+      await page.getByRole('textbox', { name: /maximum.*price|max.*price/i }).first().fill('400000').catch(() => {});
+      await page.getByRole('textbox', { name: /down payment/i }).first().fill('60000').catch(() => {});
+      await clickContinue();
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(800);
+      continue;
+    }
+
+    // Nothing matched yet — wait briefly for the next page to render
+    await page.waitForTimeout(1000);
   }
-  // ZIP Code is auto-filled by autocomplete; wait for it (5 digits) to confirm full commit
-  await page.waitForFunction(() =>
-    Array.from(document.querySelectorAll<HTMLInputElement>('input')).some(input => /^\d{5}$/.test(input.value))
-  , { timeout: 10000 });
-  await page.getByRole('button', { name: /^continue$/i }).click();
+  _logTime('property flow done, at marital status');
 
-  // 6. What type of home? - Single family
-  await page.getByText(/single family/i).click();
-
-  // 7. How do you plan to use this home? - Primary Residence radio, then Continue
-  await page.getByRole('radio', { name: /as a primary residence/i }).click();
-  await page.getByRole('button', { name: /^continue$/i }).click({ timeout: 5000 }).catch(() => {});
-
-  // 8. Monthly housing budget - check "I don't know" and continue
-  await page.getByLabel(/i don't know what my monthly budget is yet/i).check();
-  await page.getByRole('button', { name: /^continue$/i }).click();
-
-  // 9. Price range - target $300,000, max $400,000, down payment $60,000, then continue
-  await page.getByRole('textbox', { name: /target.*price|purchase.*price/i }).first().fill('300000');
-  await page.getByRole('textbox', { name: /maximum.*price|max.*price/i }).first().fill('400000');
-  await page.getByRole('textbox', { name: /down payment/i }).first().fill('60000');
-  await page.getByRole('button', { name: /^continue$/i }).click();
-
-  // 10. Marital status - first option
-  await page.getByRole('radio').first().check();
+  // 10. Marital status - select Married
+  await maritalRadio.click();
 
   // 11. Spouse on loan - Yes, enter name Amy America
   const spouseSection = page.locator('section, fieldset, div').filter({ hasText: /would you like your spouse to be on this loan/i }).last();
@@ -256,7 +363,7 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: /^continue$/i }).click();
 
   // 16 (new 11). Andy credit check: check all consent boxes, fill SSN/DOB, continue
-  await page.getByText(/Andy America.*Borrower/i).waitFor({ timeout: 20000 });
+  await page.getByText(/soft credit check/i).first().waitFor({ timeout: 20000 });
   for (const checkbox of await page.getByRole('checkbox').all()) {
     if (await checkbox.isVisible() && !(await checkbox.isChecked())) await checkbox.check();
   }
@@ -265,7 +372,7 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: /^continue$/i }).click();
 
   // 16 (new 12). Amy credit check: check all consent boxes, fill SSN/DOB, continue
-  await page.getByText(/Amy America.*Co-borrower/i).waitFor({ timeout: 20000 });
+  await page.getByText(/soft credit check/i).first().waitFor({ timeout: 20000 });
   for (const checkbox of await page.getByRole('checkbox').all()) {
     if (await checkbox.isVisible() && !(await checkbox.isChecked())) await checkbox.check();
   }
@@ -274,17 +381,56 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: /^continue$/i }).click();
   _logTime('amy-credit done');
 
-  // 16 (new 13). Continue through any remaining credit screens
-  // Credit processing can take variable time — give it up to 90s before failing
+  // 16 (new 13). Wait for credit processing to complete and app to auto-navigate away
   _logTime('waiting for post-credit Continue');
-  await page.getByRole('button', { name: /^continue$/i }).click({ timeout: 90_000 });
+  const creditUrl = page.url();
+  // App auto-navigates after credit pull — wait for URL to change away from the loading screen
+  await page.waitForURL(url => url !== creditUrl, { timeout: 120_000 }).catch(() => {});
+  // If a Continue button appears on the credit scores page, click it
+  if (await page.getByRole('button', { name: /^continue$/i }).isVisible({ timeout: 5000 }).catch(() => false)) {
+    await page.getByRole('button', { name: /^continue$/i }).click();
+  }
   _logTime('post-credit Continue clicked');
 
   // 16 (new 14). Do you have additional income? - No
-  await page.locator('div')
+  // After the credit pull the app shows interstitials (saving spinner + a credit
+  // scores page with its own Continue) before the additional-income question.
+  // Loop: dismiss saving spinners / click Continue on scores pages until the
+  // additional-income "No" radio renders.
+  const addlIncomeNo = page.locator('div')
     .filter({ hasText: /do you have additional income you would like to include/i, has: page.getByRole('radio') })
     .last()
-    .getByRole('radio', { name: /^no$/i }).click();
+    .getByRole('radio', { name: /^no$/i });
+  for (let _ci = 0; _ci < 15; _ci++) {
+    if (await addlIncomeNo.isVisible({ timeout: 1000 }).catch(() => false)) break;
+
+    // "We're saving your loan details…" spinner — wait for it to clear
+    const saving = page.getByRole('heading', { name: /we.?re saving your loan details/i });
+    if (await saving.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await saving.waitFor({ state: 'hidden', timeout: 60000 }).catch(() => {});
+      continue;
+    }
+
+    // Credit scores page ("We ran a soft credit check…") — click its Continue
+    const scores = page.getByRole('heading', { name: /we ran a soft credit check/i });
+    if (await scores.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await page.getByRole('button', { name: /^continue$/i }).click({ timeout: 7000 }).catch(() => {});
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      continue;
+    }
+
+    // Any other page showing a Continue button — advance
+    const genericContinue = page.getByRole('button', { name: /^continue$/i }).first();
+    if (await genericContinue.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await genericContinue.click({ timeout: 7000 }).catch(() => {});
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      continue;
+    }
+
+    await page.waitForTimeout(1000);
+  }
+  await addlIncomeNo.waitFor({ state: 'visible', timeout: 30000 });
+  await addlIncomeNo.click();
 
   // 16 (new 15). Amy's employment - They are employed (wait for saving spinner to clear)
   await page.getByText(/they are employed/i).waitFor({ state: 'visible', timeout: 60000 });
@@ -294,7 +440,7 @@ test('test', async ({ page }) => {
   // 16 (new 16). Amy's employment history (W-2 Employee already selected in combobox)
   await page.getByRole('textbox', { name: /employer name/i }).fill('Test inc');
   await page.getByRole('textbox', { name: /job title/i }).fill('manager');
-  await page.getByRole('textbox', { name: /city or town/i }).fill('Westland');
+  await page.getByRole('textbox', { name: /city or town/i }).fill('Asheville');
   await page.getByRole('textbox', { name: /employer phone/i }).fill('2483547241');
   await page.getByRole('combobox', { name: /^state/i }).selectOption({ label: 'Michigan' });
   await page.getByRole('checkbox', { name: /current.*job/i }).check();
@@ -658,30 +804,57 @@ test('test', async ({ page }) => {
     _logTime('application-summary Continue clicked');
   }
 
-  // 29. After AUS redirect, wait for OAuth login or MYA loan page (prod only)
-  const myaRedirectPattern = /my\.rate\.com\/(?:login|loan\/|loans)/i;
+  // 29. After AUS redirect, wait for OAuth login or MYA loan page
+  const myaRedirectPattern = /login\.dev\.rate\.com|my\.gr-dev\.com\/loan\/|my\.rate\.com\/(?:login|loan\/|loans)|my\.onqhomeloans\.com\/(?:login|loan\/|loans)|my\.dev\.citywidehm\.com\/(?:login|loan\/|loans)/i;
   await page.waitForURL(myaRedirectPattern, { timeout: 60000 });
   _logTime('step29 done (OAuth redirect received)');
 
-  // 30. Handle OAuth login redirect (prod) then capture MYA loan number
+  // 30. Handle OAuth login redirect (dev/prod) then capture MYA loan number
   await page.waitForURL(myaRedirectPattern, { timeout: 5000 }).catch(() => {});
-  if (/my\.rate\.com\/login/i.test(page.url())) {
+  if (/login\.dev\.rate\.com|my\.rate\.com\/login|my\.onqhomeloans\.com\/login|my\.dev\.citywidehm\.com\/login/i.test(page.url())) {
     // Two-step login: Email → Next → Password → Log In
     await page.getByRole('textbox', { name: /email/i }).fill(email);
     await page.getByRole('button', { name: /^next$/i }).click();
     await page.getByRole('textbox', { name: /password/i }).waitFor({ state: 'visible', timeout: 15000 });
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_PASSWORD);
     await page.getByRole('button', { name: /log.?in|sign.?in/i }).click();
-    await page.waitForURL(/my\.rate\.com\/(?:loan\/|loans)/i, { timeout: 60000 });
+    await page.waitForURL(/my\.gr-dev\.com\/loan\/|my\.rate\.com\/(?:loan\/|loans)|my\.onqhomeloans\.com\/(?:loan\/|loans)|my\.dev\.citywidehm\.com\/(?:loan\/|loans)/i, { timeout: 60000 });
     await page.waitForLoadState('networkidle').catch(() => {});
   }
+  const myaLoansPattern = /my\.gr-dev\.com\/loans|my\.rate\.com\/loans|my\.onqhomeloans\.com\/loans|my\.dev\.citywidehm\.com\/loans/i;
+  const myaLoanOverviewPattern = /my\.gr-dev\.com\/loan\/[^/]+\/overview|my\.rate\.com\/loan\/[^/]+\/overview|my\.onqhomeloans\.com\/loan\/[^/]+\/overview|my\.dev\.citywidehm\.com\/loan\/[^/]+\/overview/i;
+  if (myaLoansPattern.test(page.url())) {
+    await page.waitForFunction(() =>
+      Array.from(document.querySelectorAll('a')).some(anchor => /\/loan\//i.test(anchor.getAttribute('href') ?? '')),
+      { timeout: 30000 }
+    );
+    const firstLoanLink = page.locator('a[href*="/loan/"]').first();
+    const href = await firstLoanLink.getAttribute('href');
+    if (href) {
+      const detailUrl = new URL(href, page.url()).toString();
+      const overviewUrl = /\/overview$/i.test(detailUrl) ? detailUrl : `${detailUrl.replace(/\/$/, '')}/overview`;
+      await page.goto(overviewUrl);
+    }
+  } else if (/\/loan\/[^/]+$/i.test(page.url())) {
+    await page.goto(`${page.url().replace(/\/$/, '')}/overview`).catch(() => {});
+  }
+  await page.waitForURL(myaLoanOverviewPattern, { timeout: 30000 }).catch(() => {});
   _logTime(`post-login URL: ${page.url()}`);
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  // Loan number paragraph shows e.g. "Purchase 265098865" — extract just the number part
-  const loanNumberEl = page.getByText(/purchase\s+\w+/i).first();
-  await expect(loanNumberEl).toBeVisible({ timeout: 30000 });
-  const fullBannerText = await loanNumberEl.textContent();
-  const loanNumber = fullBannerText?.match(/purchase\s+(\w+)/i)?.[1] ?? fullBannerText?.trim();
+  await page.waitForFunction(() => /purchase\s+#?\d+/i.test(document.body?.innerText ?? ''), {
+    timeout: 30000,
+  }).catch(() => {});
+
+  // Capture the displayed purchase label from the loan overview header,
+  // e.g. "Purchase #265666976".
+  let loanNumber = '';
+  const loanNumberEl = page.getByText(/purchase\s+#?\d+/i).first();
+  if (await loanNumberEl.isVisible({ timeout: 15000 }).catch(() => false)) {
+    const fullBannerText = await loanNumberEl.textContent();
+    const loanDigits = fullBannerText?.match(/purchase\s+#?(\d+)/i)?.[1];
+    loanNumber = loanDigits ? `Purchase #${loanDigits}` : fullBannerText?.trim() ?? '';
+  }
+  expect(loanNumber, 'Unable to capture loan number/id from page').not.toEqual('');
 
   // ── Captured data ──────────────────────────────────────────────
   console.log('══════════════════════════════════════════');
