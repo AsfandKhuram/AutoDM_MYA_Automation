@@ -11,7 +11,8 @@ export type DmxProduct =
   | 'owning'
   | 'kbhs'
   | 'premia'
-  | 'qhl';
+  | 'qhl'
+  | 'certainty';
 
 export type DmxEnv = 'dev' | 'prod';
 
@@ -43,6 +44,10 @@ export const DMX_URLS: Record<DmxProduct, Record<DmxEnv, string>> = {
   qhl: {
     dev: 'https://apply-qhl.dev.saas.rate.com/apply/loan-purpose?emp-id=100000090',
     prod: 'https://apply.onqhomeloans.com/apply/loan-purpose?emp-id=36705',
+  },
+  certainty: {
+    dev: 'https://apply-certainty.dev.saas.rate.com/apply/loan-purpose?emp-id=100000073',
+    prod: 'https://apply.certaintyhomelending.com/apply/loan-purpose?emp-id=33117',
   },
 };
 
