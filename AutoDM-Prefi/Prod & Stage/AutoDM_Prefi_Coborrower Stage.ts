@@ -35,10 +35,12 @@ test('test', async ({ page, context }) => {
   await page.getByRole('button', { name: 'Close' }).click().catch(() => {});
   
   await page.getByRole('textbox', { name: 'Email' }).click();
-  await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-0616alp05a--a@yopmail.com');
-  await page.getByRole('textbox', { name: 'Password' }).click();
+  await page.getByRole('textbox', { name: 'Email' }).fill('myaccount-0714alp02a--a@yopmail.com');
+  // login.rate.com uses a two-step flow: Email → Next → Password → Log In
+  await page.getByRole('button', { name: /^next$/i }).click();
+  await page.getByRole('textbox', { name: 'Password' }).waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('textbox', { name: 'Password' }).fill(process.env.TEST_PASSWORD ?? '');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: /log.?in|sign.?in|verify/i }).click();
   
   // Wait for redirect to my.rate.com
   await page.waitForURL(/my\.rate\.com\/(okta\/oauth\/cb|loans?|loan\/)/i, { timeout: 15000 }).catch(() => {});
@@ -250,6 +252,26 @@ test('test', async ({ page, context }) => {
   ]);
   const activePage = newPageOrSame ?? page;
   await activePage.waitForLoadState('domcontentloaded').catch(() => {});
+
+  // Keep the prod session alive during the long co-borrower flow: auto-dismiss the
+  // "Anyone Home?" idle warning (before it expires) and the SSO-expired dialog.
+  await activePage.addLocatorHandler(
+    activePage.getByRole('heading', { name: /anyone home/i }),
+    async () => {
+      await activePage.getByRole('button', { name: /yes,?\s*i'?m\s*here/i }).first()
+        .click({ timeout: 3000 }).catch(() => {});
+    },
+  ).catch(() => {});
+  await activePage.addLocatorHandler(
+    activePage.getByRole('heading', { name: /single sign-on session has expired/i }),
+    async () => {
+      await activePage.getByRole('heading', { name: /single sign-on session has expired/i })
+        .locator('xpath=ancestor-or-self::*[.//button][1]')
+        .getByRole('button').first()
+        .click({ timeout: 3000 }).catch(() => {});
+    },
+  ).catch(() => {});
+
   await activePage.getByRole('button', { name: /yes,?\s*i'?m\s*here/i }).first().click({ timeout: 1500 }).catch(() => {});
   await activePage.getByRole('button', { name: /^continue$/i }).first().click({ timeout: 1500 }).catch(() => {});
   await activePage.getByRole('button', { name: /close|dismiss/i }).first().click({ timeout: 1000 }).catch(() => {});
